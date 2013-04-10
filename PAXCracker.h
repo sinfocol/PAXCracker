@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2013 Daniel Correa
+ *  Copyright (C) 2013 Daniel Correa, http://www.sinfocol.org/
  *  
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
