@@ -18,18 +18,20 @@
 #include "stdafx.h"
 #include "windows.h"
 #include "conio.h"
+#include "io.h"
 #include "PAXCracker.h"
 
 bool bruteforce_end = 0;
 char password[128] = {0};
 
 DWORD WINAPI show_password(LPVOID lpParam);
+DWORD WINAPI save_session(LPVOID lpParam);
 
 int main(int argc, char* argv[]) {
 	unsigned int width = 0, height = 0, cracked = 0, length = 0;
-	HANDLE hThread   = NULL, paxFile   = NULL;
+	HANDLE hThreadPassword = NULL, hThreadSession = NULL, paxFile   = NULL;
 	HGLOBAL result   = NULL;
-	DWORD lpThreadId = NULL;
+	DWORD lpThreadIdPassword = NULL, lpThreadIdSession = NULL;
 	FILE *wordlist   = NULL;
 
 	if (argc < 3) {
@@ -57,7 +59,8 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	hThread = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE) show_password, NULL, NULL, &lpThreadId);
+	hThreadPassword = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE) show_password, NULL, NULL, &lpThreadIdPassword);
+	hThreadSession  = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE) save_session, NULL, NULL, &lpThreadIdSession);
 	fprintf(stdout, "Press any key to view the status of the bruteforcing\n");
 
 	while (fgets(password, 128, wordlist) != NULL) {
@@ -67,16 +70,21 @@ int main(int argc, char* argv[]) {
 		}
 		
 		_is5_Seek(paxFile, 0,0);
-		result = _is5_ReadPAX(paxFile, &width, &height, 24, 0, password, 0);
 
-		if (result != 0) {
-			cracked = 1;
-			break;
+		__try {
+			result = _is5_ReadPAX(paxFile, &width, &height, 24, 0, password, 0);
+			if (result != 0) {
+				cracked = 1;
+				break;
+			}
+		} __except(EXCEPTION_EXECUTE_HANDLER) {
+			fprintf(stderr, "Error calling ReadPAX function using \"%s\" password.\n", password);
 		}
 	}
 
 	bruteforce_end = 1;
-	WaitForSingleObject(hThread, INFINITE);
+	WaitForSingleObject(hThreadPassword, INFINITE);
+	WaitForSingleObject(hThreadSession, INFINITE);
 	
 	if (cracked) {
 		fprintf(stdout, "Password found: %s\n", password);
@@ -87,7 +95,9 @@ int main(int argc, char* argv[]) {
 	_is5_CloseSource(paxFile);
 	_is5_Exit();
 	fclose(wordlist);
-	CloseHandle(hThread);
+
+	CloseHandle(hThreadPassword);
+	CloseHandle(hThreadSession);
 
     return EXIT_SUCCESS;
 }
@@ -102,6 +112,22 @@ DWORD WINAPI show_password(LPVOID lpParam) {
 
 		Sleep(1000);
 	}
+
+	return 0;
+}
+
+DWORD WINAPI save_session(LPVOID lpParam) {
+	FILE *session;
+	session = fopen(".pax_session", "w");
+
+	while (!bruteforce_end) {
+		_chsize(fileno(session), 0);
+		fseek(session, 0, SEEK_SET);
+		fprintf(session, "%s", password);
+		Sleep(10000);
+	}
+
+	fclose(session);
 
 	return 0;
 }
